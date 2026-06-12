@@ -1,0 +1,25 @@
+[project]
+name = "tv-photobook"
+version = "0.1.0"
+description = "Sync a folder of photos to a Samsung Frame TV's art mode"
+readme = "README.md"
+authors = [
+    { name = "Lucas Hanke", email = "lucas.hanke@clipboardhealth.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "samsungtvws>=3.0.5,<4",
+    "pillow>=11,<12",
+]
+
+[project.scripts]
+tv-photobook = "tv_photobook.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.11,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
