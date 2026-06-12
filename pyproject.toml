@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Sync a folder of photos to a Samsung Frame TV's art mode"
 readme = "README.md"
 authors = [
-    { name = "Lucas Hanke", email = "lucas.hanke@clipboardhealth.com" }
+    { name = "Lucas Hanke", email = "hankelucas@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
