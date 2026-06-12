@@ -1,18 +1,19 @@
 """Compose several photos onto one 16:9 canvas (a diptych and friends).
 
-The Frame shows a single artwork at a time, so "two portraits side by side"
-has to be one image. Each photo is fitted into its own cell preserving aspect
-ratio, then given a soft shadow so it reads as recessed into the mat, the same
-way the TV's ``shadowbox`` matte makes single photos look. The surrounding fill
-matches the ``polar`` matte color so framed singles and diptychs look like one
-set on the wall.
+The Frame shows a single artwork at a time, so "two photos side by side" has to
+be one image. Each photo is fitted into an equal-width cell (so a landscape
+ends up shorter than a portrait, never stretched), then the photos are packed
+together and the whole set is centered on the canvas, leaving equal mat on the
+left and right. The gap between photos equals the tallest photo's distance to
+the top/bottom border, so the spacing inside the set matches the spacing around
+it. Each photo gets a soft shadow so it reads as recessed into the warm
+off-white mat, like the TV's ``shadowbox`` matte does for single photos.
 
-    margin                       gap                       margin
-   |----| |--------------------| |--| |--------------------| |----|
-          +--------------------+      +--------------------+
-          |     photo 1        |      |     photo 2        |
-          |  (fit + shadow)    |      |  (fit + shadow)    |
-          +--------------------+      +--------------------+
+       gap = the tallest photo's top/bottom border
+    |------|          v          |------|
+   |------| +-------------+ |--| +------+ |------|
+           |  landscape   |     | port |
+           +-------------+      +------+
 """
 
 from __future__ import annotations
@@ -25,9 +26,8 @@ from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageOps, Unidentifie
 # 4K UHD, the Frame's native panel resolution.
 CANVAS = (3840, 2160)
 
-# A warm off-white approximating the Frame's "polar" matte; tune with
-# --frame-color if it does not match your panel exactly.
-POLAR = "#f4f0e8"
+# A warm off-white mat behind composites; tune with --frame-color to taste.
+DEFAULT_FRAME_COLOR = "#eee7d7"
 
 # Shadowbox depth: a soft dark halo hugging each photo, weighted toward the top
 # edge so the picture looks set down into the mat (light from above).
@@ -43,31 +43,34 @@ class ComposeError(Exception):
 
 @dataclass(frozen=True)
 class Layout:
-    """The frame baked into a composite: border, inner gap, and fill color."""
+    """The frame baked into a composite: border and fill color.
+
+    The gap between photos is not configured here; it is derived per composite
+    from the tallest photo's distance to the border (see ``compose``).
+    """
 
     margin: int = 100
-    gap: int = 100
-    color: str = POLAR
+    color: str = DEFAULT_FRAME_COLOR
 
     def signature(self) -> str:
         """Stable string folded into a group's hash so a look change re-composes.
 
-        The ``sb1`` tag versions the compositing itself, so tweaking the shadow
-        algorithm re-uploads existing groups even when the layout is unchanged.
+        The ``pc2`` tag versions the compositing itself, so changing the layout
+        or shadow algorithm re-uploads existing groups even when margin and
+        color are unchanged.
         """
-        return f"sb1:{self.margin}:{self.gap}:{self.color}"
+        return f"pc2:{self.margin}:{self.color}"
 
 
 def compose(members: list[Path], dest: Path, layout: Layout) -> None:
-    """Lay the members out in a row on a CANVAS-sized background, save to dest."""
+    """Fit each photo in an equal cell, center the packed set, save to dest."""
     width, height = CANVAS
     cols = len(members)
-    cell_w = (width - 2 * layout.margin - layout.gap * (cols - 1)) // cols
     cell_h = height - 2 * layout.margin
-    if cell_w <= 0 or cell_h <= 0:
+    if cell_h <= 0 or width - 2 * layout.margin <= 0:
         raise ComposeError(
-            f"margin {layout.margin} and gap {layout.gap} leave no room for "
-            f"{cols} photos on a {width}x{height} canvas"
+            f"margin {layout.margin} leaves no room for {cols} photos on a "
+            f"{width}x{height} canvas"
         )
 
     try:
@@ -75,22 +78,39 @@ def compose(members: list[Path], dest: Path, layout: Layout) -> None:
     except ValueError as e:
         raise ComposeError(f"unknown frame color {layout.color!r}: {e}") from e
 
-    placements = []
-    for i, path in enumerate(members):
+    photos = []
+    for path in members:
         try:
             with Image.open(path) as raw:
-                photo = ImageOps.exif_transpose(raw).convert("RGB")
+                photos.append(ImageOps.exif_transpose(raw).convert("RGB"))
         except (OSError, UnidentifiedImageError) as e:
             raise ComposeError(f"could not read {path.name}: {e}") from e
-        fitted = ImageOps.contain(photo, (cell_w, cell_h))
-        x = layout.margin + i * (cell_w + layout.gap) + (cell_w - fitted.width) // 2
-        y = layout.margin + (cell_h - fitted.height) // 2
-        placements.append((fitted, x, y))
+
+    # Size once in gapless cells to find the tallest photo; its top/bottom mat
+    # sets the gap between photos. Then re-size reserving that gap so the packed
+    # set still fits within the side margins.
+    cell_w0 = (width - 2 * layout.margin) // cols
+    tallest = max(ImageOps.contain(p, (cell_w0, cell_h)).height for p in photos)
+    gap = (height - tallest) // 2
+    cell_w = (width - 2 * layout.margin - gap * (cols - 1)) // cols
+    if cell_w <= 0:
+        raise ComposeError(
+            f"margin {layout.margin} leaves no room for {cols} photos on a "
+            f"{width}x{height} canvas"
+        )
+    fitted = [ImageOps.contain(p, (cell_w, cell_h)) for p in photos]
+
+    total_w = sum(p.width for p in fitted) + gap * (cols - 1)
+    x = (width - total_w) // 2
+    placements = []
+    for photo in fitted:
+        placements.append((photo, x, (height - photo.height) // 2))
+        x += photo.width + gap
 
     canvas = Image.new("RGB", CANVAS, background)
-    _cast_shadows(canvas, [(x, y, p.width, p.height) for p, x, y in placements])
-    for fitted, x, y in placements:
-        canvas.paste(fitted, (x, y))
+    _cast_shadows(canvas, [(px, py, p.width, p.height) for p, px, py in placements])
+    for photo, px, py in placements:
+        canvas.paste(photo, (px, py))
 
     try:
         canvas.save(dest, "JPEG", quality=92)

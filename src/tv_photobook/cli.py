@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .compose import POLAR, Layout
+from .compose import DEFAULT_FRAME_COLOR, Layout
 from .state import StateError, StateStore
 from .sync import SyncPlan, execute_plan, plan_sync, scan_folder
 from .tv import FrameTV, TVError
@@ -41,23 +41,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--frame-color",
-        default=POLAR,
+        default=DEFAULT_FRAME_COLOR,
         help=(
-            "background of composed subfolder diptychs, a color name or hex; "
-            f"defaults to {POLAR}, an approximation of the Frame's polar matte"
+            "background of composed subfolder diptychs, a color name or hex "
+            f"(default: {DEFAULT_FRAME_COLOR}, a warm off-white)"
         ),
     )
     parser.add_argument(
         "--frame-margin",
         type=int,
         default=100,
-        help="outer border of composed diptychs in pixels (default: 100)",
-    )
-    parser.add_argument(
-        "--frame-gap",
-        type=int,
-        default=100,
-        help="gap between photos in composed diptychs in pixels (default: 100)",
+        help=(
+            "border of composed diptychs in pixels; also the spacing between "
+            "the photos (default: 100)"
+        ),
     )
     parser.add_argument(
         "--token-file",
@@ -144,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
         tv.connect()
         tv.validate_matte(args.matte)
 
-        layout = Layout(args.frame_margin, args.frame_gap, args.frame_color)
+        layout = Layout(args.frame_margin, args.frame_color)
         artworks, warnings = scan_folder(
             args.folder, int(args.max_size_mb * 1_000_000), args.matte, layout
         )

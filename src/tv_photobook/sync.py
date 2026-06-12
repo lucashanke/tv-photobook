@@ -56,7 +56,7 @@ class PhotoGroup:
     """A subdirectory of photos shown as one side-by-side composite.
 
     The frame is painted into the pixels, so the TV matte is always "none";
-    the layout is folded into sha256 so border/gap/color edits re-compose.
+    the layout is folded into sha256 so border/color edits re-compose.
     """
 
     name: str

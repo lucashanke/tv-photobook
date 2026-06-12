@@ -57,9 +57,10 @@ cleanly. Worst case after a crash is one duplicate upload, never lost art.
 - **Showing two photos at once:** put them in a subfolder. The Frame displays
   one artwork at a time, so a subfolder is composed locally into a single
   16:9 image with its photos side by side (sorted by filename: first is left),
-  each fitted inside its own cell so nothing is stretched. Two portraits is the
-  sweet spot; more than two tile in a row. The frame around them is painted
-  into the image (`--frame-color`, `--frame-margin`, `--frame-gap`), so these
+  each fitted so nothing is stretched. The set is centered, and the gap between
+  the photos matches the tallest photo's distance to the border, so the spacing
+  looks even. Two portraits is the sweet spot; more than two tile in a row. The
+  frame is painted into the image (`--frame-color`, `--frame-margin`), so these
   composites ignore `--matte`. Editing, adding, or removing a photo in the
   subfolder re-composes and re-uploads that one frame.
 - Photos display inside a matte (frame) that preserves their proportions;
